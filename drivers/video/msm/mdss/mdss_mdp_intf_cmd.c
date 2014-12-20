@@ -760,13 +760,14 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl, int panel_power_state)
 			pr_debug("%s: turn off clocks\n", __func__);
 			turn_off_clocks = true;
 		} else {
-                        /*
-	                 * Transition from ultra low power to low power does
-	                 * not require any special handling. The clocks would
-	                 * get turned on when the first update comes.
-                         */
-			pr_debug("%s: nothing to be done.\n", __func__);
-			return 0;
+			/*
+			 * Transition from ultra low power to low power does
+			 * not require any special handling. Just rest the
+			 * intf_stopped flag so that the clocks would
+			 */
+			pr_debug("%s: reset intf_stopped flag.\n", __func__);
+			atomic_set(&ctx->intf_stopped, 0);
+			goto end;
 		}
 	}
 
@@ -848,12 +849,11 @@ panel_events:
 		WARN(ret, "intf %d unblank error (%d)\n", ctl->intf_num, ret);
 	}
 
-	ctx->panel_power_state = panel_power_state;
-
 	if (!panel_off) {
 		pr_debug("%s: cmd_stop with panel always on\n", __func__);
 		goto end;
 	}
+
 	pr_debug("%s: turn off panel\n", __func__);
 	memset(ctx, 0, sizeof(*ctx));
 	ctl->priv_data = NULL;
@@ -867,6 +867,8 @@ panel_events:
 end:
 	MDSS_XLOG(ctl->num, ctx->koff_cnt, ctx->clk_enabled,
 				ctx->rdptr_enabled, XLOG_FUNC_EXIT);
+	if (!IS_ERR_VALUE(ret))
+		ctx->panel_power_state = panel_power_state;
 	pr_debug("%s:-\n", __func__);
 
 	return ret;
